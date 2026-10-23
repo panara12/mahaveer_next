@@ -22,6 +22,23 @@ const getProductId = (quotationProduct) => {
   return typeof product === 'object' ? product?._id?.toString() : product?.toString();
 };
 
+const getQuotationTerms = (termsConditions) => {
+  const paymentTerms = typeof termsConditions?.paymentTerms === 'string'
+    ? termsConditions.paymentTerms
+    : '';
+  const selected = Array.isArray(termsConditions?.selected)
+    ? [...new Set(termsConditions.selected)]
+    : [...DEFAULT_SELECTED_QUOTATION_TERMS];
+
+  // Older quotations lost this camel-case ID during API validation, even
+  // though their payment-term text was saved. Restore the selected state.
+  if (paymentTerms.trim() && !selected.includes('paymentTerms')) {
+    selected.push('paymentTerms');
+  }
+
+  return { selected, paymentTerms };
+};
+
 export default function QuotationsList() {
   const { user } = useAuth();
   const {
@@ -99,10 +116,7 @@ export default function QuotationsList() {
       gstNumber: quotation.gstNumber || '',
       discount: Number(quotation.discount || 0),
       createdAt: quotation.createdAt ? new Date(quotation.createdAt).toISOString().slice(0, 10) : '',
-      termsConditions: quotation.termsConditions || {
-        selected: DEFAULT_SELECTED_QUOTATION_TERMS,
-        paymentTerms: '',
-      },
+      termsConditions: getQuotationTerms(quotation.termsConditions),
       products: (quotation.products || []).map((product) => {
         const productId = getProductId(product);
         const details = productMap[productId] || {};
@@ -616,16 +630,16 @@ export default function QuotationsList() {
                     />
                     <div className="flex-1">
                       <label htmlFor="edit-quotation-payment-terms">6. Payment terms</label>
-                      <input
+                      <textarea
                         id="edit-quotation-payment-terms"
-                        type="text"
                         value={editForm.termsConditions.paymentTerms}
                         onChange={(event) => setEditForm((previous) => ({
                           ...previous,
                           termsConditions: { ...previous.termsConditions, paymentTerms: event.target.value },
                         }))}
                         placeholder="Enter customized payment terms"
-                        className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        rows={3}
+                        className="mt-1 w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       />
                     </div>
                   </div>

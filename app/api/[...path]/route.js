@@ -926,6 +926,15 @@ async function handleQuotations(request, method, route, user, query, body) {
 }
 
 function quotationRow(row) {
+  const termsConditions = normalizeQuotationTerms(
+    parseJsonColumn(row.terms_conditions, { selected: [], paymentTerms: "" }),
+  );
+  // Quotes created before `paymentTerms` was accepted as a selected ID still
+  // contain the entered text. Treat that text as an enabled payment term.
+  if (termsConditions.paymentTerms && !termsConditions.selected.includes("paymentTerms")) {
+    termsConditions.selected.push("paymentTerms");
+  }
+
   return {
     _id: row.id,
     q_id: row.q_id,
@@ -937,7 +946,7 @@ function quotationRow(row) {
     gstNumber: row.gst_number,
     discount: row.discount,
     products: parseJsonColumn(row.products, []),
-    termsConditions: parseJsonColumn(row.terms_conditions, { selected: [], paymentTerms: "" }),
+    termsConditions,
     Subtotal: row.subtotal,
     gstamount: row.gst_amount,
     grandtotal: row.grandtotal,
@@ -951,7 +960,7 @@ function normalizeQuotationTerms(value) {
     return { selected: [], paymentTerms: "" };
   }
   const selected = Array.isArray(value.selected)
-    ? [...new Set(value.selected.filter((id) => typeof id === "string" && /^[a-z-]+$/.test(id)))]
+    ? [...new Set(value.selected.filter((id) => typeof id === "string" && /^[a-z][A-Za-z-]*$/.test(id)))]
     : [];
   const paymentTerms = typeof value.paymentTerms === "string"
     ? value.paymentTerms.trim().slice(0, 1000)

@@ -58,6 +58,7 @@ export default function QuotationBuilder({ selectedProductsWithSizes, onComplete
             mrp            : sizeData.mrp,
             productDiscount: 0,
             finalPrice     : sizeData.mrp,
+            isNetRate      : false,
           });
         }
       });
@@ -72,7 +73,7 @@ export default function QuotationBuilder({ selectedProductsWithSizes, onComplete
     const skuList = rows[index].product.sku || rows[index].product.sizes || [];
     const sizeData = skuList.find((s) => s.size === size);
     if (sizeData) {
-      const disc = rows[index].productDiscount;
+      const disc = rows[index].isNetRate ? 0 : rows[index].productDiscount;
       rows[index] = {
         ...rows[index],
         size,
@@ -99,10 +100,31 @@ export default function QuotationBuilder({ selectedProductsWithSizes, onComplete
 
   const handleProductDiscountChange = (index, val) => {
     const rows = [...quotationProducts];
+    if (rows[index].isNetRate) return;
     const disc = Math.max(0, Math.min(100, val));
     rows[index].productDiscount = disc;
     rows[index].finalPrice = rows[index].mrp - (rows[index].mrp * disc) / 100;
     setQuotationProducts(rows);
+  };
+
+  const handleNetRateToggle = (index, checked) => {
+    setQuotationProducts((previous) => previous.map((qp, rowIndex) => {
+      if (rowIndex !== index) return qp;
+      if (checked) return { ...qp, isNetRate: true, productDiscount: 0, finalPrice: qp.mrp };
+      return {
+        ...qp,
+        isNetRate: false,
+        productDiscount: discount,
+        finalPrice: qp.mrp - (qp.mrp * discount) / 100,
+      };
+    }));
+  };
+
+  const handleNetRateChange = (index, val) => {
+    const netRate = Math.max(0, Number.isFinite(val) ? val : 0);
+    setQuotationProducts((previous) => previous.map((qp, rowIndex) =>
+      rowIndex === index ? { ...qp, finalPrice: netRate } : qp
+    ));
   };
 
   const handleDiscountChange = (val) => {
@@ -111,8 +133,9 @@ export default function QuotationBuilder({ selectedProductsWithSizes, onComplete
     setQuotationProducts((prev) =>
       prev.map((qp) => ({
         ...qp,
-        productDiscount: disc,
-        finalPrice     : qp.mrp - (qp.mrp * disc) / 100,
+        productDiscount: qp.isNetRate ? 0 : disc,
+        // A manually entered net rate is final and never receives a global discount.
+        finalPrice     : qp.isNetRate ? qp.finalPrice : qp.mrp - (qp.mrp * disc) / 100,
       }))
     );
   };
@@ -175,7 +198,7 @@ export default function QuotationBuilder({ selectedProductsWithSizes, onComplete
         totalpcs   : qp.innerPack * qp.quantity,
         cartoon    : Number(((1 / (qp.masterPack / qp.innerPack)) * qp.quantity).toFixed(2)),
         mrp        : qp.mrp,
-        discount   : qp.productDiscount,
+        discount   : qp.isNetRate ? 0 : qp.productDiscount,
         finalPrice : qp.finalPrice,
         total      : qp.innerPack * qp.quantity * qp.finalPrice,
         gstPercentage: qp.product.gstPercentage ?? qp.product.gstPercent ?? 0,
@@ -329,13 +352,17 @@ export default function QuotationBuilder({ selectedProductsWithSizes, onComplete
                     </div>
                     <div>
                       <label className="block text-xs text-muted-foreground mb-1">Disc %</label>
-                      <input type="number" value={qp.productDiscount} onChange={(e) => handleProductDiscountChange(index, Number(e.target.value))} className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" min="0" max="100" />
+                      <input type="number" value={qp.productDiscount} onChange={(e) => handleProductDiscountChange(index, Number(e.target.value))} disabled={qp.isNetRate} className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50" min="0" max="100" />
                     </div>
+                    <label className="col-span-2 flex items-center gap-2 rounded border border-border px-3 py-2 text-sm text-foreground">
+                      <input type="checkbox" checked={qp.isNetRate} onChange={(e) => handleNetRateToggle(index, e.target.checked)} className="accent-primary" />
+                      Net rate (ignore discounts)
+                    </label>
                   </div>
                   <div className="text-sm border-t border-border pt-2 space-y-1">
                     <div className="flex justify-between"><span className="text-muted-foreground">Total Pcs:</span><span>{qp.innerPack * qp.quantity}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Carton:</span><span>{((1 / (qp.masterPack / qp.innerPack)) * qp.quantity).toFixed(2)}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Final Price:</span><span>₹{qp.finalPrice.toFixed(2)}</span></div>
+                    <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">{qp.isNetRate ? 'Net Rate:' : 'Final Price:'}</span>{qp.isNetRate ? <input type="number" value={qp.finalPrice} onChange={(e) => handleNetRateChange(index, Number(e.target.value))} className="w-28 rounded border border-border bg-background px-2 py-1 text-right text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" min="0" step="0.01" /> : <span>₹{qp.finalPrice.toFixed(2)}</span>}</div>
                     <div className="flex justify-between font-medium"><span>Total:</span><span>₹{(qp.innerPack * qp.quantity * qp.finalPrice).toFixed(2)}</span></div>
                   </div>
                 </div>
@@ -355,6 +382,7 @@ export default function QuotationBuilder({ selectedProductsWithSizes, onComplete
                   <th className="text-left py-3 px-2 text-foreground">Total Pcs</th>
                   <th className="text-left py-3 px-2 text-foreground">Carton</th>
                   <th className="text-left py-3 px-2 text-foreground">MRP</th>
+                  <th className="text-left py-3 px-2 text-foreground">Net Rate</th>
                   <th className="text-left py-3 px-2 text-foreground">Disc %</th>
                   <th className="text-left py-3 px-2 text-foreground">Final Price</th>
                   <th className="text-left py-3 px-2 text-foreground">Total</th>
@@ -391,9 +419,15 @@ export default function QuotationBuilder({ selectedProductsWithSizes, onComplete
                       <td className="py-3 px-2 text-foreground">{((1 / (qp.masterPack / qp.innerPack)) * qp.quantity).toFixed(2)}</td>
                       <td className="py-3 px-2 text-muted-foreground">₹{qp.mrp}</td>
                       <td className="py-3 px-2">
-                        <input type="number" value={qp.productDiscount} onChange={(e) => handleProductDiscountChange(index, Number(e.target.value))} className="w-16 px-2 py-1 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" min="0" max="100" />
+                        <label className="flex cursor-pointer items-center gap-2 text-xs text-foreground">
+                          <input type="checkbox" checked={qp.isNetRate} onChange={(e) => handleNetRateToggle(index, e.target.checked)} className="h-4 w-4 accent-primary" />
+                          Use net rate
+                        </label>
                       </td>
-                      <td className="py-3 px-2 text-foreground">₹{qp.finalPrice.toFixed(2)}</td>
+                      <td className="py-3 px-2">
+                        <input type="number" value={qp.productDiscount} onChange={(e) => handleProductDiscountChange(index, Number(e.target.value))} disabled={qp.isNetRate} className="w-16 px-2 py-1 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50" min="0" max="100" />
+                      </td>
+                      <td className="py-3 px-2 text-foreground">{qp.isNetRate ? <input type="number" value={qp.finalPrice} onChange={(e) => handleNetRateChange(index, Number(e.target.value))} className="w-20 px-2 py-1 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" min="0" step="0.01" aria-label={`Net rate for ${qp.product.name}`} /> : <>₹{qp.finalPrice.toFixed(2)}</>}</td>
                       <td className="py-3 px-2 text-foreground font-medium">₹{(qp.innerPack * qp.quantity * qp.finalPrice).toFixed(2)}</td>
                       <td className="py-3 px-2">
                         <button onClick={() => removeProduct(index)} className="p-1.5 text-destructive hover:bg-destructive/10 rounded">
@@ -446,13 +480,13 @@ export default function QuotationBuilder({ selectedProductsWithSizes, onComplete
                 />
                 <div className="flex-1">
                   <label htmlFor="quotation-payment-terms">6. Payment terms</label>
-                  <input
+                  <textarea
                     id="quotation-payment-terms"
-                    type="text"
                     value={paymentTerms}
                     onChange={(event) => setPaymentTerms(event.target.value)}
                     placeholder="Enter customized payment terms"
-                    className={`${inputCls} mt-2`}
+                    rows={3}
+                    className={`${inputCls} mt-2 resize-y`}
                   />
                 </div>
               </div>

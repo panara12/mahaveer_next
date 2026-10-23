@@ -9,11 +9,13 @@ import QuotationsList from './QuotationsList';
 import ThemeToggle from './ThemeToggle';
 import UserManagement from './UserManagement';
 import WhatsAppConnect from './WhatsAppConnect';
+import NewQuotationDialog from './NewQuotationDialog';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
   const [view, setView] = useState('companies');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isNewQuotationOpen, setIsNewQuotationOpen] = useState(false);
 
   const handleViewChange = (newView) => {
     setView(newView);
@@ -40,6 +42,13 @@ export default function AdminDashboard() {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsNewQuotationOpen(true)}
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">New Quotation</span>
+              </button>
               {/* <ThemeToggle /> */}
               <button
                 onClick={logout}
@@ -130,6 +139,15 @@ export default function AdminDashboard() {
           {view === 'whatsapp' && <WhatsAppConnect />}
         </main>
       </div>
+
+      <NewQuotationDialog
+        open={isNewQuotationOpen}
+        onClose={() => setIsNewQuotationOpen(false)}
+        onComplete={() => {
+          setIsNewQuotationOpen(false);
+          setView('quotations');
+        }}
+      />
     </div>
   );
 }

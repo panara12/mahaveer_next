@@ -76,7 +76,7 @@ export async function generateQuotationPDF(quotation, selectedColumns, mode) {
   const selectedTerms = DEFAULT_QUOTATION_TERMS.flatMap((term, index) => {
     const terms = [];
     if (index === 5 && selectedTermIds.has('paymentTerms') && termsConditions.paymentTerms?.trim()) {
-      terms.push({ number: 6, text: `Payment Terms: ${termsConditions.paymentTerms.trim()}` });
+      terms.push({ number: 6, text: `Payment Terms:\n${termsConditions.paymentTerms.trim()}` });
     }
     if (selectedTermIds.has(term.id)) {
       terms.push({ number: index < 5 ? index + 1 : index + 2, text: term.text });
@@ -346,7 +346,11 @@ export async function generateQuotationPDF(quotation, selectedColumns, mode) {
     selectedTerms.forEach((term) => {
       pdf.setFontSize(7);
       pdf.setFont('helvetica', 'normal');
-      const lines = pdf.splitTextToSize(`${term.number}. ${term.text}`, usable - 4);
+      // Split each manually entered line separately so Enter in payment terms
+      // is retained in the generated quotation PDF.
+      const lines = String(`${term.number}. ${term.text}`)
+        .split(/\r?\n/)
+        .flatMap((line) => pdf.splitTextToSize(line || ' ', usable - 4));
       const blockHeight = lines.length * 4;
       checkPage(blockHeight + 2);
       lines.forEach((line) => {
